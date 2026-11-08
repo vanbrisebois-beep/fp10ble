@@ -1,0 +1,28 @@
+name: build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Organiser le projet
+        run: |
+          mkdir -p app/src/main/java/com/example/fp10ble
+          mv AndroidManifest.xml app/src/main/
+          mv app.build.gradle.kts app/build.gradle.kts
+          mv MainActivity.kt BleMidiSender.kt app/src/main/java/com/example/fp10ble/
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+      - run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fp10ble-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
