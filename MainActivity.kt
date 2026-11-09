@@ -64,7 +64,26 @@ class MainActivity : Activity() {
             send {
                 val b = hexInput.text.toString().trim().split(Regex("[\\s,]+"))
                     .filter { it.isNotEmpty() }.map { it.toInt(16) }.toIntArray()
-                sender.send(*b)
+                // Découpe en messages séparés : chaque F0…F7 part seul, avec ses propres timestamps
+                var i = 0
+                var n = 0
+                while (i < b.size) {
+                    if (b[i] == 0xF0) {
+                        var j = i
+                        while (j < b.size && b[j] != 0xF7) j++
+                        if (j >= b.size) { log("SysEx sans F7 final : ignoré"); break }
+                        sender.send(*b.copyOfRange(i, j + 1)); n++
+                        i = j + 1
+                    } else if (b[i] >= 0x80) {
+                        var j = i + 1
+                        while (j < b.size && b[j] < 0x80) j++
+                        sender.send(*b.copyOfRange(i, j)); n++
+                        i = j
+                    } else {
+                        i++
+                    }
+                }
+                log("$n message(s) envoyé(s) séparément")
             }
         }
 
