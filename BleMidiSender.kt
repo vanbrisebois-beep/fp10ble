@@ -110,6 +110,15 @@ class BleMidiSender(
             onState("Prêt (notifications activées)")
         }
 
+        override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic, value: ByteArray) {
+            onState("RX: " + value.joinToString(" ") { "%02X".format(it) })
+        }
+
+        @Suppress("DEPRECATION")
+        override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic) {
+            onState("RX: " + (c.value ?: ByteArray(0)).joinToString(" ") { "%02X".format(it) })
+        }
+
         // Contrôle de flux : on n'envoie le paquet suivant qu'après cet accusé
         override fun onCharacteristicWrite(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
             if (status != BluetoothGatt.GATT_SUCCESS) onState("ÉCHEC écriture status=$status") else onState("  paquet écrit OK")
@@ -196,6 +205,7 @@ class BleMidiSender(
         val c = midiChar ?: return
         val g = gatt ?: return
         val data = queue.poll() ?: return
+        onState("TX: " + data.joinToString(" ") { "%02X".format(it) })
         writing = true
         val type = if (useWriteWithResponse) BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                    else BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE

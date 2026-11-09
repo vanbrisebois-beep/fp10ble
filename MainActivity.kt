@@ -49,15 +49,23 @@ class MainActivity : Activity() {
         btn("1. Scanner / choisir le FP-10") { scan() }
         btn("2. Test court : CC7 = 30 (volume bas)") { send { sender.send(0xB0, 7, 30) } }
         btn("3. Test court : CC7 = 100 (volume haut)") { send { sender.send(0xB0, 7, 100) } }
+        btn("3b. Note DO4 (Note On puis Off)") {
+            send { sender.send(0x90, 60, 100) }
+            ui.postDelayed({ sender.send(0x80, 60, 64) }, 600)
+        }
 
-        root.addView(TextView(this).apply { text = "SysEx à envoyer (hex, F0 … F7) :" })
+        root.addView(TextView(this).apply { text = "Message à envoyer (hex ; SysEx = F0 … F7) :" })
         hexInput = EditText(this).apply {
             setText("F0 41 10 42 12 40 00 7F 00 41 F7") // GS reset (confirmé sur ton FP-10)
             textSize = 12f
         }
         root.addView(hexInput)
-        btn("4. Envoyer le SysEx") {
-            send { sender.sendSysexHex(hexInput.text.toString()) }
+        btn("4. Envoyer (SysEx ou message court)") {
+            send {
+                val b = hexInput.text.toString().trim().split(Regex("[\\s,]+"))
+                    .filter { it.isNotEmpty() }.map { it.toInt(16) }.toIntArray()
+                sender.send(*b)
+            }
         }
 
         respBox = CheckBox(this).apply {
