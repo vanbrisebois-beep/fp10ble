@@ -10,6 +10,7 @@
 
     <application
         android:label="FP10 Ctrl"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.DeviceDefault.Light">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

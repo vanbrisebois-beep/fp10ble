@@ -12,6 +12,8 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -57,6 +59,12 @@ class MainActivity : Activity() {
         }
         val connectBtn = Button(this).apply {
             text = "🔌 Connecter FP-10"
+            setTextColor(Color.BLACK)
+            setPadding(32, 0, 32, 0)
+            background = GradientDrawable().apply {
+                setColor(0xFF00E5FF.toInt())   // cyan, comme les accents de l'interface
+                cornerRadius = 20f
+            }
             setOnClickListener { scan() }
         }
         statusView = TextView(this).apply {

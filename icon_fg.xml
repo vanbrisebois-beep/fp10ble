@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.8" android:scaleY="0.8" android:pivotX="54" android:pivotY="54">
+    <!-- bandeau cyan au-dessus du clavier -->
+    <path android:fillColor="#00E5FF" android:pathData="M22,30h64v6H22z" />
+    <!-- touches blanches -->
+    <path android:fillColor="#FFFFFF" android:pathData="M22,36h64v40H22z" />
+    <!-- séparations entre touches blanches -->
+    <path android:fillColor="#9E9E9E"
+        android:pathData="M29.5,36h1v40h-1z M37.5,36h1v40h-1z M45.5,36h1v40h-1z M53.5,36h1v40h-1z M61.5,36h1v40h-1z M69.5,36h1v40h-1z M77.5,36h1v40h-1z" />
+    <!-- touches noires -->
+    <path android:fillColor="#1E1E1E"
+        android:pathData="M27.5,36h5v24h-5z M35.5,36h5v24h-5z M51.5,36h5v24h-5z M59.5,36h5v24h-5z M67.5,36h5v24h-5z" />
+    </group>
+</vector>

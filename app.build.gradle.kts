@@ -37,3 +37,12 @@ val copyWeb = tasks.register<Copy>("copyWeb") {
     into("$projectDir/src/main/assets")
 }
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(copyWeb) }
+
+// Fichiers d'icône (à la racine du dépôt) copiés dans res/ avant chaque build
+val copyIcon = tasks.register<Copy>("copyIcon") {
+    from("$rootDir/icon_adaptive.xml") { rename { "ic_launcher.xml" }; into("mipmap-anydpi-v26") }
+    from("$rootDir/icon_fg.xml") { rename { "ic_launcher_foreground.xml" }; into("drawable") }
+    from("$rootDir/icon_bg.xml") { rename { "ic_launcher_background.xml" }; into("drawable") }
+    into("$projectDir/src/main/res")
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(copyIcon) }
