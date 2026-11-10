@@ -402,7 +402,7 @@
       <circle cx="256" cy="85" r="18" fill="#00e5ff"/>
     </svg>
     <span>Contrôleur FP-10 Pro</span>
-    <span class="version-tag">v43</span>
+    <span class="version-tag">v44</span>
   </h1>
 
   <div class="status-card">
@@ -473,6 +473,9 @@
       </div>
       <div id="design-box" style="display:none; flex-direction:column; gap:6px; margin-bottom:8px;">
         <div id="mdl-design-rows"></div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem;">
+          <input type="checkbox" id="mdl-design-live" checked style="width:auto;"> 🔊 Écoute en direct (le piano change pendant que tu bouges les curseurs)
+        </label>
         <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem;">
           <input type="checkbox" id="mdl-design-remote" checked style="width:auto;"> Remote control en premier
         </label>
@@ -1355,13 +1358,31 @@
         </div>`).join('');
     }
 
-    function onModalDesignInput(id, val) {
+    const designTimers = {};
+
+    // Écoute en direct : envoie la valeur au piano pendant qu'on bouge le curseur
+    function modalLive(p, v) {
+      const chk = document.getElementById('mdl-design-live');
+      if (!chk || !chk.checked || !midiOutput) return;
+      clearTimeout(designTimers[p.id]);
+      designTimers[p.id] = setTimeout(async () => {
+        if (!designRemoteSent) {
+          midiOutput.send(new Uint8Array(REMOTE_CONTROL_MSG));
+          designRemoteSent = true;
+          await delay(30);
+        }
+        midiOutput.send(new Uint8Array(designMsg(p, v)));
+      }, 40);
+    }
+
+    function onModalDesignInput(id, val, live = true) {
       const p = designParam(id);
       const v = Math.max(p.min, Math.min(p.max, parseInt(val, 10)));
       if (isNaN(v)) return;
       document.getElementById('mdl-slider-' + id).value = v;
       document.getElementById('mdl-val-' + id).innerText = fmtDesign(p, v);
       document.getElementById('mdl-chk-' + id).checked = true;
+      if (live) modalLive(p, v);
     }
 
     function stepModalDesign(id, delta) {
@@ -1376,7 +1397,7 @@
         const bytes = parseHexSysEx(inp.value);
         const v = (p.signed ? bytes[12] - 0x40 : bytes[12]);
         if (isNaN(v)) return;
-        onModalDesignInput(p.id, v);
+        onModalDesignInput(p.id, v, false);
       });
     }
 
