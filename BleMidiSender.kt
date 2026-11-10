@@ -148,6 +148,34 @@ class BleMidiSender(
         sendSysex(bytes)
     }
 
+    /** Octets MIDI bruts (un ou plusieurs messages) : chaque F0…F7 part seul, avec ses propres timestamps. */
+    fun sendRaw(b: IntArray) {
+        if (!ready) { onState("Pas connecté : message ignoré"); return }
+        var i = 0
+        while (i < b.size) {
+            if (b[i] == 0xF0) {
+                var j = i
+                while (j < b.size && b[j] != 0xF7) j++
+                if (j >= b.size) break
+                send(*b.copyOfRange(i, j + 1))
+                i = j + 1
+            } else if (b[i] >= 0x80) {
+                var j = i + 1
+                while (j < b.size && b[j] < 0x80) j++
+                send(*b.copyOfRange(i, j))
+                i = j
+            } else {
+                i++
+            }
+        }
+    }
+
+    fun sendRawHex(hex: String) {
+        val b = hex.trim().split(Regex("[\\s,]+")).filter { it.isNotEmpty() }
+            .map { it.removePrefix("0x").toInt(16) }.toIntArray()
+        sendRaw(b)
+    }
+
     // ---------- Encodage BLE MIDI ----------
 
     private fun tsNow(): Int = (System.currentTimeMillis() and 0x1FFF).toInt()
@@ -223,15 +251,8 @@ class BleMidiSender(
     }
 }
 
-/**
- * Pont pour ton outil HTML dans une WebView :
- *   webView.settings.javaScriptEnabled = true
- *   webView.addJavascriptInterface(MidiBridge(sender), "AndroidMidi")
- * Côté JS : AndroidMidi.sysex("F0 41 10 42 12 ... F7"); AndroidMidi.cc(0, 7, 100);
- */
+/** Pont appelé par index.html : AndroidMidi.raw("F0 41 … F7") */
 class MidiBridge(private val s: BleMidiSender) {
-    @JavascriptInterface fun sysex(hex: String) = s.sendSysexHex(hex)
-    @JavascriptInterface fun cc(ch: Int, cc: Int, v: Int) = s.send(0xB0 or (ch and 15), cc, v)
-    @JavascriptInterface fun pc(ch: Int, p: Int) = s.send(0xC0 or (ch and 15), p)
+    @JavascriptInterface fun raw(hex: String) = s.sendRawHex(hex)
     @JavascriptInterface fun ready(): Boolean = s.ready
 }

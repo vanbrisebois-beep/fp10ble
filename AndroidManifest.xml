@@ -9,7 +9,7 @@
         android:usesPermissionFlags="neverForLocation" />
 
     <application
-        android:label="FP10 BLE Test"
+        android:label="FP10 Ctrl"
         android:theme="@android:style/Theme.DeviceDefault.Light">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

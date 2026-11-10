@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>FP-10 Pro Controller</title>
+
+  <!-- Favicon / Apple Touch Icon en Inline SVG -->
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- Manifest PWA -->
+  <link rel="manifest" href="manifest.json">
+  
+  <meta name="theme-color" content="#121212">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg: #121212;
+      --card: #1e1e1e;
+      --accent: #00e5ff;
+      --accent-active: #00b2cc;
+      --danger: #ff5252;
+      --text: #ffffff;
+      --subtext: #aaaaaa;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 12px;
+      margin: 0;
+    }
+
+    .header-title {
+      font-size: 1.3rem;
+      text-align: center;
+      color: var(--accent);
+      margin-top: 0;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-icon {
+      width: 28px;
+      height: 28px;
+      vertical-align: middle;
+    }
+
+    .version-tag {
+      font-size: 0.7rem;
+      background: #2a2a2a;
+      color: #888;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      font-weight: normal;
+    }
+
+    .status-card {
+      background: var(--card);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #333;
+    }
+
+    .wake-lock-status { font-size: 0.75rem; color: #888; }
+
+    .device-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      width: 100%;
+      max-width: 400px;
+      justify-content: center;
+    }
+
+    .device-select {
+      flex: 1;
+      min-width: 0;
+      background: #121212;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .volume-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      width: 100%;
+      max-width: 500px;
+      justify-content: center;
+    }
+
+    .volume-label { font-size: 1.6rem; }
+
+    .volume-channel-select {
+      flex: 0 0 72px;
+      padding: 8px 4px;
+      font-size: 0.8rem;
+    }
+
+    .volume-row input[type="range"] {
+      flex: 1;
+      min-width: 0;
+      -webkit-appearance: none;
+      height: 12px;
+      background: #333;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .volume-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: 3px solid #000;
+    }
+
+    .volume-row input[type="range"]::-moz-range-thumb {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: 3px solid #000;
+    }
+
+    .volume-value {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: var(--accent);
+      flex: 0 0 42px;
+      text-align: right;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 8px 14px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .btn:active { opacity: 0.8; }
+    .btn-secondary { background: #333; color: var(--text); border: 1px solid #444; }
+    .btn-danger { background: var(--danger); color: #fff; border: none; }
+    .btn-small { padding: 4px 6px; font-size: 0.75rem; }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .config-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Style des boutons haute visibilité pour la scène */
+    .midi-btn.selected {
+      border-color: #ffd600 !important;
+      box-shadow: 0 0 0 2px #ffd600 inset;
+    }
+    .select-badge {
+      position: absolute;
+      top: 4px;
+      left: 6px;
+      font-size: 0.75rem;
+      color: #ffd600;
+      font-weight: 800;
+    }
+    .midi-btn {
+      background: linear-gradient(145deg, #282828, #181818);
+      border: 2px solid var(--accent);
+      color: #ffffff;
+      padding: 26px 6px 10px 6px;
+      border-radius: 12px;
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1.25;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      text-align: center;
+      min-height: 90px;
+      word-break: break-word;
+      user-select: none;
+      -webkit-user-select: none;
+      box-shadow: 0 4px 12px rgba(0, 229, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      transition: all 0.08s ease-in-out;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+    }
+
+    .midi-btn:active {
+      background: var(--accent);
+      color: #000000;
+      border-color: #ffffff;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.8);
+      transform: translateY(2px);
+      text-shadow: none;
+    }
+
+    .edit-badge {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      background: var(--accent);
+      color: #000;
+      font-size: 0.6rem;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-weight: 900;
+      pointer-events: none;
+    }
+
+    .move-controls {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      display: flex;
+      gap: 2px;
+    }
+
+    .move-controls button {
+      padding: 2px 4px;
+      font-size: 0.65rem;
+      line-height: 1;
+      font-weight: bold;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      padding: 12px;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      overflow-y: auto;
+    }
+
+    .modal-content {
+      background: var(--card);
+      padding: 16px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 480px;
+      max-height: 92vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid #444;
+    }
+
+    .modal-content label { font-size: 0.85rem; color: var(--subtext); font-weight: bold; }
+    .modal-content input, .modal-content select {
+      background: #121212;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .sub-item-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      margin-bottom: 6px;
+      width: 100%;
+    }
+
+    .sub-item-row select { width: 75px; flex-shrink: 0; padding: 6px 2px; }
+    .sub-item-row input { flex: 1; min-width: 0; }
+
+    .pc-row { display: flex; gap: 6px; width: 100%; }
+    .pc-row select { width: 90px; flex-shrink: 0; }
+    .pc-row input { flex: 1; min-width: 0; }
+
+    .section-title {
+      font-size: 0.85rem;
+      color: var(--accent);
+      border-bottom: 1px solid #333;
+      padding-bottom: 4px;
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+
+    /* ===== Onglets + Piano Design ===== */
+    .tab-bar { display: flex; gap: 6px; margin-bottom: 12px; }
+    .tab-btn {
+      flex: 1; background: #2a2a2a; color: var(--subtext); border: 1px solid #444;
+      padding: 10px 8px; font-weight: bold; font-size: 0.95rem; border-radius: 6px; cursor: pointer;
+    }
+    .tab-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    .design-card {
+      background: var(--card); border: 1px solid #333; border-radius: 10px;
+      padding: 10px 12px; margin: 0 auto 10px auto; max-width: 500px;
+    }
+    .design-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .design-name { font-size: 0.95rem; }
+    .design-range { font-size: 0.7rem; color: var(--subtext); margin-left: 6px; }
+    .design-val { font-size: 1.5rem; font-weight: bold; color: var(--accent); }
+    .design-row { display: flex; align-items: center; gap: 8px; }
+    .design-row input[type="range"] {
+      flex: 1; min-width: 0; -webkit-appearance: none; appearance: none;
+      height: 12px; background: #333; border-radius: 6px; outline: none;
+    }
+    .design-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%;
+      background: var(--accent); border: 2px solid #000;
+    }
+    .design-row input[type="range"]::-moz-range-thumb {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--accent); border: 2px solid #000;
+    }
+    .design-step { flex: 0 0 44px; height: 44px; font-size: 1.4rem; padding: 0; }
+    .design-last {
+      font-family: monospace; font-size: 0.72rem; color: var(--subtext);
+      white-space: pre-wrap; word-break: break-all; max-width: 500px; margin: 0 auto 8px auto; min-height: 1.2em;
+    }
+    .design-note { font-size: 0.75rem; color: var(--subtext); max-width: 500px; margin: 0 auto; text-align: center; }
+
+    #import-file { display: none; }
+  </style>
+</head>
+<body>
+
+  <h1 class="header-title">
+    <svg class="app-icon" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="100" fill="#121212"/>
+      <rect x="40" y="140" width="432" height="232" rx="16" fill="#1e1e1e" stroke="#333333" stroke-width="8"/>
+      <rect x="70" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="112" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="154" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="196" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="238" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="280" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="322" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="364" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="406" y="170" width="32" height="170" rx="6" fill="#ffffff"/>
+      <rect x="96" y="170" width="22" height="100" rx="4" fill="#000000"/>
+      <rect x="138" y="170" width="22" height="100" rx="4" fill="#000000"/>
+      <rect x="222" y="170" width="22" height="100" rx="4" fill="#000000"/>
+      <rect x="264" y="170" width="22" height="100" rx="4" fill="#000000"/>
+      <rect x="306" y="170" width="22" height="100" rx="4" fill="#000000"/>
+      <circle cx="256" cy="85" r="18" fill="#00e5ff"/>
+    </svg>
+    <span>Contrôleur FP-10 Pro</span>
+    <span class="version-tag">v43</span>
+  </h1>
+
+  <div class="status-card">
+    <span id="status" style="font-weight: bold; font-size: 0.9rem;">Statut : Non initialisé</span>
+    <span id="wake-lock-status" class="wake-lock-status">💡 Écran : Inactif</span>
+    
+    <div class="device-row">
+      <select id="midi-select" class="device-select" onchange="selectMidiOutput(this.value)">
+        <option value="">-- Aucun périphérique --</option>
+      </select>
+      <button class="btn btn-secondary btn-small" onclick="initMIDI()" title="Rafraîchir les périphériques">🔄</button>
+      <button class="btn btn-danger btn-small" id="btn-delete-device" onclick="removeSelectedDevice()" style="display:none;" title="Supprimer ce contrôleur">🗑️ Supprimer</button>
+    </div>
+  </div>
+
+  <div id="tab-boutons">
+  <div class="toolbar">
+    <button class="btn btn-secondary" onclick="toggleEditMode()">
+      ✏️ Mode Édition : <span id="edit-status">OFF</span>
+    </button>
+    <button class="btn" onclick="openModal()">+ Nouveau Bouton</button>
+  </div>
+
+  <div class="config-toolbar">
+    <button class="btn btn-secondary btn-small" onclick="toggleSelectMode()">☑️ Sélection : <span id="select-status">OFF</span></button>
+    <button class="btn btn-secondary btn-small" onclick="exportAllButtons()">💾 Sauvegarder toute la banque</button>
+    <button class="btn btn-secondary btn-small" onclick="document.getElementById('import-file').click()">📂 Charger boutons</button>
+    <input type="file" id="import-file" accept=".json,application/json,text/plain,*/*" onchange="importConfig(event)">
+  </div>
+
+  <div class="config-toolbar">
+    <button class="btn btn-secondary btn-small" onclick="saveAsDefaultBank()">⭐ Définir cette banque comme banque de démarrage</button>
+    <button class="btn btn-secondary btn-small" onclick="restoreDefaultBank()">♻️ Recharger la banque de démarrage</button>
+  </div>
+
+  <div class="config-toolbar" id="select-actions" style="display:none;">
+    <button class="btn btn-secondary btn-small" onclick="selectAllButtons()">Tout</button>
+    <button class="btn btn-secondary btn-small" onclick="clearSelection()">Aucun</button>
+    <button class="btn btn-secondary btn-small" onclick="exportSelected()">💾 Sauvegarder sélection</button>
+    <button class="btn btn-danger btn-small" onclick="deleteSelected()">🗑️ Effacer sélection</button>
+  </div>
+
+  <div class="volume-row" style="margin: 8px auto;">
+    <span class="volume-label">🔊</span>
+    <input type="range" id="volume-slider" min="0" max="100" value="100" oninput="onVolumeChange(this.value)">
+    <span id="volume-value" class="volume-value">100</span>
+  </div>
+
+  <div class="grid" id="button-grid"></div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-content">
+      <h3 id="modal-title" style="margin:0">Éditer le Bouton</h3>
+      
+      <label>Nom du bouton</label>
+      <input type="text" id="btn-label" placeholder="ex: Grand Piano" style="width:100%;">
+
+      <div class="section-title">
+        <span>1. Trames SysEx (Hex)</span>
+        <button class="btn btn-secondary btn-small" onclick="addSysexInput()">+ Ajouter SysEx</button>
+      </div>
+      <div id="sysex-container"></div>
+
+      <div class="section-title">
+        <span>🎛️ Piano Design</span>
+        <button class="btn btn-secondary btn-small" onclick="toggleDesignBox()">🎚️ Régler</button>
+      </div>
+      <div id="design-box" style="display:none; flex-direction:column; gap:6px; margin-bottom:8px;">
+        <div id="mdl-design-rows"></div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem;">
+          <input type="checkbox" id="mdl-design-remote" checked style="width:auto;"> Remote control en premier
+        </label>
+        <button class="btn btn-small" onclick="addDesignToSysex()">➕ Ajouter les paramètres cochés aux SysEx</button>
+        <div id="mdl-design-status" style="font-size:0.75rem; color:#888;"></div>
+      </div>
+
+      <div class="section-title">
+        <span>🎹 Import capture Piano App</span>
+        <button class="btn btn-secondary btn-small" onclick="togglePianoPaste()">📋 Coller</button>
+      </div>
+      <div id="piano-paste-box" style="display:none; flex-direction:column; gap:6px; margin-bottom:8px;">
+        <textarea id="piano-paste-input" rows="4" placeholder="Colle ici la capture brute (F0 ... F7, une ou plusieurs lignes)" style="width:100%; background:#121212; border:1px solid #333; color:#fff; padding:8px; border-radius:6px; font-family:monospace; font-size:0.8rem;"></textarea>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-small" style="flex:1;" onclick="processPianoAppCapture()">Traiter et remplir les SysEx</button>
+          <button class="btn btn-secondary btn-small" onclick="togglePianoPaste()">Annuler</button>
+        </div>
+        <div id="piano-paste-status" style="font-size:0.75rem; color:#888;"></div>
+      </div>
+
+      <div class="section-title">
+        <span>2. Control Change (CC)</span>
+        <button class="btn btn-secondary btn-small" onclick="addCcInput()">+ Ajouter CC</button>
+      </div>
+      <div id="cc-container"></div>
+
+      <label style="margin-top:6px;">Program Change (PC) - Laisser vide pour désactiver</label>
+      <div class="pc-row">
+        <select id="btn-pc-channel">
+          <option value="1" selected>Ch 1</option><option value="2">Ch 2</option><option value="3">Ch 3</option><option value="4">Ch 4</option>
+          <option value="5">Ch 5</option><option value="6">Ch 6</option><option value="7">Ch 7</option><option value="8">Ch 8</option>
+          <option value="9">Ch 9</option><option value="10">Ch 10</option><option value="11">Ch 11</option><option value="12">Ch 12</option>
+          <option value="13">Ch 13</option><option value="14">Ch 14</option><option value="15">Ch 15</option><option value="16">Ch 16</option>
+        </select>
+        <input type="number" id="btn-pc" placeholder="Aucun (vide)">
+      </div>
+
+      <div class="modal-actions">
+        <div style="display:flex; gap:4px;">
+          <button class="btn btn-danger btn-small" id="btn-delete" onclick="deleteCurrentButton()" style="display:none;">Supprimer</button>
+          <button class="btn btn-secondary btn-small" id="btn-duplicate" onclick="duplicateCurrentButton()" style="display:none;">Dupliquer</button>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-secondary" onclick="testCurrentButton()">🔊 Tester</button>
+          <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+          <button class="btn" onclick="saveButton()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="export-modal">
+    <div class="modal-content">
+      <h3 style="margin:0">Exporter la configuration</h3>
+      <p style="font-size:0.85rem; color: var(--subtext); margin:0;">
+        Le téléchargement automatique n'est pas toujours supporté dans l'application.
+        Le texte ci-dessous est présélectionné : appuie longuement puis choisis
+        "Copier", ou utilise le bouton ci-dessous.
+      </p>
+      <textarea id="export-textarea" readonly
+        style="width:100%; height:200px; font-family:monospace; font-size:0.8rem; box-sizing:border-box;"
+        onclick="this.focus(); this.select();"></textarea>
+      <div class="modal-actions">
+        <div></div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-secondary" onclick="closeExportModal()">Fermer</button>
+          <button class="btn" onclick="copyExportTextarea()">Copier</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service Worker (sw.js) pour le mode hors-ligne -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service Worker hors-ligne activé'))
+        .catch((err) => console.error('Erreur SW:', err));
+    }
+  </script>
+
+  <script>
+    let midiAccess = null;
+    let midiOutput = null;
+    let availableOutputs = [];
+    let editMode = false;
+    let selectMode = false;
+    let selectedIndices = new Set();
+    let currentEditIndex = null;
+    let wakeLock = null;
+
+    let buttons = JSON.parse(localStorage.getItem('fp10_buttons_v27')) || 
+                  JSON.parse(localStorage.getItem('fp10_buttons_v26')) || 
+                  JSON.parse(localStorage.getItem('fp10_buttons_v25')) || 
+                  JSON.parse(localStorage.getItem('fp10_default_bank')) || [
+      { label: "🎹 Piano Patch 1", pc: "", pcChannel: 1, cc: [], sysex: [] }
+    ];
+
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          document.getElementById('wake-lock-status').innerText = "💡 Écran : Toujours allumé";
+          document.getElementById('wake-lock-status').style.color = "#00e5ff";
+
+          wakeLock.addEventListener('release', () => {
+            document.getElementById('wake-lock-status').innerText = "💡 Écran : Inactif";
+            document.getElementById('wake-lock-status').style.color = "#888";
+          });
+        } catch (err) {
+          document.getElementById('wake-lock-status').innerText = "💡 Écran : Refusé";
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+      if (wakeLock !== null && document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    });
+
+    document.addEventListener('click', () => {
+      if (!wakeLock) { requestWakeLock(); }
+    });
+
+    function saveToStorage() {
+      localStorage.setItem('fp10_buttons_v27', JSON.stringify(buttons));
+      renderButtons();
+    }
+
+    function onVolumeChange(val) {
+      document.getElementById('volume-value').innerText = val;
+      localStorage.setItem('fp10_volume_value', val);
+      sendVolumeCC();
+    }
+
+    function sendVolumeCC() {
+      if (!midiOutput) return;
+      const val = Math.max(0, Math.min(100, parseInt(document.getElementById('volume-slider').value)));
+      const cs = rolandChecksum([...VOLUME_SYSEX_ADDR, val]);
+      const msg = [...VOLUME_SYSEX_HEADER, ...VOLUME_SYSEX_ADDR, val, cs, 0xF7];
+      midiOutput.send(new Uint8Array(msg));
+    }
+
+    function restoreVolumeControls() {
+      const savedVal = localStorage.getItem('fp10_volume_value');
+      if (savedVal !== null) {
+        document.getElementById('volume-slider').value = savedVal;
+        document.getElementById('volume-value').innerText = savedVal;
+      }
+    }
+
+    function saveAsDefaultBank() {
+      localStorage.setItem('fp10_default_bank', JSON.stringify(buttons));
+      alert(`Banque de démarrage enregistrée (${buttons.length} bouton(s)).\nElle se rechargera automatiquement à l'ouverture de l'app si besoin.`);
+    }
+
+    function restoreDefaultBank() {
+      const saved = localStorage.getItem('fp10_default_bank');
+      if (!saved) { alert("Aucune banque de démarrage enregistrée pour l'instant."); return; }
+      if (!confirm("Remplacer tous les boutons actuels par la banque de démarrage enregistrée ?")) return;
+      try {
+        buttons = JSON.parse(saved);
+        selectedIndices.clear();
+        saveToStorage();
+      } catch (err) {
+        alert("Erreur de lecture de la banque de démarrage : " + err);
+      }
+    }
+
+    function renderButtons() {
+      const grid = document.getElementById('button-grid');
+      grid.innerHTML = '';
+
+      buttons.forEach((b, index) => {
+        const btn = document.createElement('div');
+        btn.className = 'midi-btn' + (selectMode && selectedIndices.has(index) ? ' selected' : '');
+        btn.onclick = () => handleButtonClick(index);
+
+        let moveControls = '';
+        if (selectMode) {
+          moveControls = `<span class="select-badge">${selectedIndices.has(index) ? '☑️' : '☐'}</span>`;
+        } else if (editMode) {
+          moveControls = `
+            <div class="move-controls">
+              <button class="btn btn-secondary btn-small" onclick="moveButton(event, ${index}, -1)">◄</button>
+              <button class="btn btn-secondary btn-small" onclick="moveButton(event, ${index}, -3)">▲</button>
+              <button class="btn btn-secondary btn-small" onclick="moveButton(event, ${index}, 3)">▼</button>
+              <button class="btn btn-secondary btn-small" onclick="moveButton(event, ${index}, 1)">►</button>
+            </div>
+            <span class="edit-badge">Éditer</span>
+          `;
+        }
+
+        btn.innerHTML = `${moveControls}<span>${b.label}</span>`;
+        grid.appendChild(btn);
+      });
+    }
+
+    function handleButtonClick(index) {
+      if (selectMode) { toggleSelection(index); }
+      else if (editMode) { openModal(index); }
+      else { triggerMidiWithDelay(buttons[index]); }
+    }
+
+    function toggleSelectMode() {
+      selectMode = !selectMode;
+      if (selectMode) { editMode = false; document.getElementById('edit-status').innerText = "OFF"; }
+      selectedIndices.clear();
+      document.getElementById('select-status').innerText = selectMode ? "ON" : "OFF";
+      document.getElementById('select-actions').style.display = selectMode ? "flex" : "none";
+      renderButtons();
+    }
+
+    function toggleSelection(index) {
+      if (selectedIndices.has(index)) selectedIndices.delete(index);
+      else selectedIndices.add(index);
+      renderButtons();
+    }
+
+    function selectAllButtons() {
+      buttons.forEach((_, index) => selectedIndices.add(index));
+      renderButtons();
+    }
+
+    function clearSelection() {
+      selectedIndices.clear();
+      renderButtons();
+    }
+
+    function exportSelected() {
+      if (selectedIndices.size === 0) { alert("Aucun bouton sélectionné."); return; }
+      let name = prompt("Nom de la sauvegarde :", "fp10_selection");
+      if (name === null) return; // annulé
+      name = name.trim();
+      if (name === "") name = "fp10_selection";
+      // Nettoie les caractères invalides pour un nom de fichier
+      name = name.replace(/[\\/:*?"<>|]/g, "_");
+      if (!name.toLowerCase().endsWith(".json")) name += ".json";
+
+      const selected = buttons.filter((_, index) => selectedIndices.has(index));
+      doExportButtons(selected, name);
+    }
+
+    function exportAllButtons() {
+      if (buttons.length === 0) { alert("Aucun bouton à sauvegarder."); return; }
+      let name = prompt("Nom de la sauvegarde :", "fp10_banque");
+      if (name === null) return; // annulé
+      name = name.trim();
+      if (name === "") name = "fp10_banque";
+      name = name.replace(/[\\/:*?"<>|]/g, "_");
+      if (!name.toLowerCase().endsWith(".json")) name += ".json";
+
+      doExportButtons(buttons, name);
+    }
+
+    function deleteSelected() {
+      if (selectedIndices.size === 0) { alert("Aucun bouton sélectionné."); return; }
+      if (!confirm(`Supprimer ${selectedIndices.size} bouton(s) sélectionné(s) ?`)) return;
+      buttons = buttons.filter((_, index) => !selectedIndices.has(index));
+      selectedIndices.clear();
+      saveToStorage();
+    }
+
+    function moveButton(event, index, offset) {
+      event.stopPropagation();
+      const newIndex = index + offset;
+      if (newIndex < 0 || newIndex >= buttons.length) return;
+      const temp = buttons[index];
+      buttons[index] = buttons[newIndex];
+      buttons[newIndex] = temp;
+      saveToStorage();
+    }
+
+    async function initMIDI() {
+      const statusEl = document.getElementById('status');
+      const selectEl = document.getElementById('midi-select');
+      const deleteDeviceBtn = document.getElementById('btn-delete-device');
+
+      // ===== App Android native : envoi BLE MIDI via le pont AndroidMidi =====
+      if (window.AndroidMidi) {
+        const nativeOut = {
+          id: 'android-ble',
+          name: 'FP-10 (BLE natif)',
+          send(data) {
+            AndroidMidi.raw(Array.from(data).map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join(' '));
+          }
+        };
+        availableOutputs = [nativeOut];
+        selectEl.innerHTML = '<option value="android-ble">FP-10 (BLE natif)</option>';
+        selectMidiOutput('android-ble');
+        return;
+      }
+
+      if (!navigator.requestMIDIAccess) {
+        statusEl.innerText = "Statut : Web MIDI indisponible";
+        statusEl.style.color = "#ff5252";
+        return;
+      }
+
+      try {
+        midiAccess = await navigator.requestMIDIAccess({ sysex: true });
+        availableOutputs = Array.from(midiAccess.outputs.values());
+        selectEl.innerHTML = '';
+        
+        if (availableOutputs.length === 0) {
+          selectEl.innerHTML = '<option value="">-- Aucun contrôleur trouvé --</option>';
+          statusEl.innerText = "Statut : Aucun contrôleur détecté";
+          statusEl.style.color = "#ff5252";
+          midiOutput = null;
+          deleteDeviceBtn.style.display = "none";
+          return;
+        }
+
+        availableOutputs.forEach((out, idx) => {
+          const option = document.createElement('option');
+          option.value = out.id;
+          option.innerText = out.name || `Périphérique ${idx + 1}`;
+          selectEl.appendChild(option);
+        });
+
+        selectMidiOutput(availableOutputs[0].id);
+
+        midiAccess.onstatechange = (e) => {
+          if (e.port.type === "output") { initMIDI(); }
+        };
+
+      } catch (err) {
+        statusEl.innerText = "Statut : Accès SysEx refusé";
+        statusEl.style.color = "#ff5252";
+      }
+    }
+
+    function selectMidiOutput(id) {
+      designRemoteSent = false;
+      const statusEl = document.getElementById('status');
+      const deleteDeviceBtn = document.getElementById('btn-delete-device');
+
+      if (!id) {
+        midiOutput = null;
+        statusEl.innerText = "Statut : Déconnecté";
+        statusEl.style.color = "#ff5252";
+        deleteDeviceBtn.style.display = "none";
+        return;
+      }
+
+      midiOutput = availableOutputs.find(out => out.id === id) || null;
+
+      if (midiOutput) {
+        statusEl.innerText = `Connecté : ${midiOutput.name}`;
+        statusEl.style.color = "#00e5ff";
+        deleteDeviceBtn.style.display = "inline-block";
+      } else {
+        statusEl.innerText = "Statut : Introuvable";
+        statusEl.style.color = "#ff5252";
+        deleteDeviceBtn.style.display = "none";
+      }
+    }
+
+    function removeSelectedDevice() {
+      if (!midiOutput) return;
+      if (confirm(`Déconnecter "${midiOutput.name}" ?`)) {
+        const selectEl = document.getElementById('midi-select');
+        const removedId = midiOutput.id;
+        availableOutputs = availableOutputs.filter(out => out.id !== removedId);
+
+        // Reconstruire la liste avec seulement les périphériques restants
+        selectEl.innerHTML = '<option value="">-- Aucun périphérique --</option>';
+        availableOutputs.forEach((out, idx) => {
+          const option = document.createElement('option');
+          option.value = out.id;
+          option.innerText = out.name || `Périphérique ${idx + 1}`;
+          selectEl.appendChild(option);
+        });
+
+        selectMidiOutput("");
+      }
+    }
+
+    // ===== Import capture Piano App : ajout remote control + retrait volume panel =====
+    const REMOTE_CONTROL_MSG = [0xF0,0x7E,0x10,0x06,0x02,0x41,0x19,0x03,0x00,0x00,0x10,0x01,0x00,0x00,0xF7];
+    const VOLUME_OFFSET = 19; // position du byte volume dans les données du bloc DT1 (01 00 02 00)
+    const VOLUME_SYSEX_HEADER = [0xF0, 0x41, 0x10, 0x00, 0x00, 0x00, 0x28, 0x12];
+    const VOLUME_SYSEX_ADDR = [0x01, 0x00, 0x02, 0x00 + VOLUME_OFFSET]; // 01 00 02 13
+
+    function togglePianoPaste() {
+      const box = document.getElementById('piano-paste-box');
+      const showing = box.style.display === 'flex';
+      box.style.display = showing ? 'none' : 'flex';
+      if (!showing) document.getElementById('piano-paste-input').focus();
+    }
+
+    function parseHexBytes(str){
+      const clean = str.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+      const bytes = clean.map(b => parseInt(b, 16));
+      if (bytes.some(b => isNaN(b) || b < 0 || b > 255)) throw new Error('Octet invalide détecté.');
+      return bytes;
+    }
+
+    function toHexStr2(bytes){
+      return bytes.map(b => b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+    }
+
+    function rolandChecksum(bytes){
+      const sum = bytes.reduce((a,b) => a+b, 0) % 128;
+      return sum === 0 ? 0 : 128 - sum;
+    }
+
+    function sameMessage(a, b){
+      return a.length === b.length && a.every((v,i) => v === b[i]);
+    }
+
+    // Scinde un bloc DT1 (01 00 02 00) en 2 messages, en excluant le byte à VOLUME_OFFSET
+    function splitVolumeBlock(bytes){
+      const HEADER_LEN = 8;
+      const ADDR_LEN = 4;
+      if (bytes.length < HEADER_LEN + ADDR_LEN + 2) return null;
+
+      const header = bytes.slice(0, HEADER_LEN);
+      const addr = bytes.slice(HEADER_LEN, HEADER_LEN + ADDR_LEN);
+      const data = bytes.slice(HEADER_LEN + ADDR_LEN, bytes.length - 2);
+
+      // On ne scinde que le bloc d'adresse 01 00 02 00 (celui qui contient le volume)
+      const isVolumeBlock = addr[0] === 0x01 && addr[1] === 0x00 && addr[2] === 0x02 && addr[3] === 0x00;
+      if (!isVolumeBlock || VOLUME_OFFSET >= data.length) return null;
+
+      const dataA = data.slice(0, VOLUME_OFFSET);
+      const dataB = data.slice(VOLUME_OFFSET + 1);
+
+      const addrB = addr.slice();
+      addrB[3] = addrB[3] + VOLUME_OFFSET + 1;
+      if (addrB[3] > 0x7F) return null;
+
+      const csA = rolandChecksum([...addr, ...dataA]);
+      const csB = rolandChecksum([...addrB, ...dataB]);
+
+      const msgA = [...header, ...addr, ...dataA, csA, 0xF7];
+      const msgB = [...header, ...addrB, ...dataB, csB, 0xF7];
+      return [msgA, msgB];
+    }
+
+    function processPianoAppCapture(){
+      const statusEl = document.getElementById('piano-paste-status');
+      statusEl.style.color = '#888';
+      try {
+        const raw = document.getElementById('piano-paste-input').value;
+        if (!raw.trim()) throw new Error('Colle d\'abord une capture.');
+
+        const tokens = raw.trim().replace(/\r/g,'').split('F0').filter(Boolean);
+        const messages = tokens.map(t => parseHexBytes('F0 ' + t.trim()));
+
+        messages.forEach(m => {
+          if (m[0] !== 0xF0 || m[m.length-1] !== 0xF7) throw new Error('Un message ne commence pas par F0 ou ne finit pas par F7.');
+        });
+
+        const hasRemote = messages.some(m => sameMessage(m, REMOTE_CONTROL_MSG));
+
+        const outMessages = [];
+        if (!hasRemote) outMessages.push(REMOTE_CONTROL_MSG);
+
+        let splitCount = 0;
+        for (const msg of messages){
+          if (sameMessage(msg, REMOTE_CONTROL_MSG)) { outMessages.push(msg); continue; }
+          const result = msg[1] === 0x41 ? splitVolumeBlock(msg) : null;
+          if (result){
+            outMessages.push(result[0], result[1]);
+            splitCount++;
+          } else {
+            outMessages.push(msg);
+          }
+        }
+
+        // Remplit les champs SysEx du bouton avec le résultat, dans l'ordre
+        document.getElementById('sysex-container').innerHTML = '';
+        outMessages.forEach(m => addSysexInput(toHexStr2(m)));
+
+        statusEl.style.color = '#00e5ff';
+        statusEl.innerText = `✓ ${splitCount} bloc(s) volume retiré(s)` + (hasRemote ? '' : ' — remote control ajouté') + `. ${outMessages.length} trame(s) prête(s).`;
+        document.getElementById('piano-paste-input').value = '';
+
+      } catch(e){
+        statusEl.style.color = '#ff5252';
+        statusEl.innerText = 'Erreur : ' + e.message;
+      }
+    }
+
+    function parseHexSysEx(hexStr) {
+      if (!hexStr) return null;
+      const cleaned = hexStr.replace(/0x/gi, '').replace(/,/g, ' ').trim();
+      const parts = cleaned.split(/\s+/);
+      const bytes = parts.map(p => parseInt(p, 16)).filter(b => !isNaN(b));
+      return bytes.length > 0 ? bytes : null;
+    }
+
+    async function triggerMidiWithDelay(config) {
+      if (!midiOutput) {
+        alert("Aucun périphérique MIDI sélectionné !");
+        return;
+      }
+
+      let hasSentSysex = false;
+      let hasSentCc = false;
+
+      // 1. SysEx
+      if (config.sysex && Array.isArray(config.sysex)) {
+        let combinedBytes = [];
+        for (const hexStr of config.sysex) {
+          const bytes = parseHexSysEx(hexStr);
+          if (bytes) combinedBytes.push(...bytes);
+        }
+        // Découpe en messages F0…F7 envoyés un par un, avec une pause entre chacun
+        // (le piano ne digère pas plusieurs SysEx collés dans un seul envoi)
+        const sysexMsgs = [];
+        let cur = [];
+        for (const b of combinedBytes) {
+          cur.push(b);
+          if (b === 0xF7) { sysexMsgs.push(cur); cur = []; }
+        }
+        if (cur.length > 0) sysexMsgs.push(cur);
+        for (let i = 0; i < sysexMsgs.length; i++) {
+          midiOutput.send(new Uint8Array(sysexMsgs[i]));
+          hasSentSysex = true;
+          if (i < sysexMsgs.length - 1) {
+            await delay(sameMessage(sysexMsgs[i], REMOTE_CONTROL_MSG) ? 60 : 35);
+          }
+        }
+      }
+
+      if (hasSentSysex) await delay(200);
+
+      // 2. Control Change (CC)
+      if (config.cc && Array.isArray(config.cc)) {
+        for (const item of config.cc) {
+          const parts = item.split(',').map(n => parseInt(n.trim()));
+          if (parts.length >= 3) {
+            const ch = Math.max(0, Math.min(15, parts[0] - 1));
+            midiOutput.send([0xB0 + ch, parts[1], parts[2]]);
+            hasSentCc = true;
+          }
+        }
+      }
+
+      if (hasSentCc) await delay(200);
+
+      // 3. Program Change (PC) - Canal 1 par défaut
+      if (config.pc !== "" && config.pc !== null && !isNaN(parseInt(config.pc))) {
+        const pcChannel = (config.pcChannel !== undefined ? parseInt(config.pcChannel) : 1) - 1;
+        const safeChannel = Math.max(0, Math.min(15, pcChannel));
+        midiOutput.send([0xC0 + safeChannel, parseInt(config.pc)]);
+      }
+    }
+
+    function toggleEditMode() {
+      editMode = !editMode;
+      if (editMode && selectMode) {
+        selectMode = false;
+        selectedIndices.clear();
+        document.getElementById('select-status').innerText = "OFF";
+        document.getElementById('select-actions').style.display = "none";
+      }
+      document.getElementById('edit-status').innerText = editMode ? "ON" : "OFF";
+      renderButtons();
+    }
+
+    function openModal(index = null) {
+      currentEditIndex = index;
+      const modal = document.getElementById('modal');
+      document.getElementById('cc-container').innerHTML = '';
+      document.getElementById('sysex-container').innerHTML = '';
+      document.getElementById('design-box').style.display = 'none';
+      document.getElementById('mdl-design-rows').innerHTML = '';
+      document.getElementById('mdl-design-status').innerText = '';
+
+      if (index !== null) {
+        const b = buttons[index];
+        document.getElementById('modal-title').innerText = "Éditer le bouton";
+        document.getElementById('btn-label').value = b.label;
+        document.getElementById('btn-pc').value = (b.pc !== undefined) ? b.pc : "";
+        document.getElementById('btn-pc-channel').value = (b.pcChannel !== undefined) ? b.pcChannel : "1";
+
+        if (b.sysex) b.sysex.forEach(val => addSysexInput(val));
+        if (b.cc) b.cc.forEach(val => addCcInput(val));
+
+        document.getElementById('btn-delete').style.display = "block";
+        document.getElementById('btn-duplicate').style.display = "block";
+      } else {
+        document.getElementById('modal-title').innerText = "Nouveau bouton";
+        document.getElementById('btn-label').value = "";
+        document.getElementById('btn-pc').value = "";
+        document.getElementById('btn-pc-channel').value = "1"; // Force Canal 1
+        document.getElementById('btn-delete').style.display = "none";
+        document.getElementById('btn-duplicate').style.display = "none";
+      }
+
+      modal.style.display = "flex";
+    }
+
+    function addSysexInput(value = "") {
+      const container = document.getElementById('sysex-container');
+      const row = document.createElement('div');
+      row.className = 'sub-item-row';
+      row.innerHTML = `
+        <button class="btn btn-secondary btn-small" onclick="moveSubItem(this, -1)">▲</button>
+        <button class="btn btn-secondary btn-small" onclick="moveSubItem(this, 1)">▼</button>
+        <input type="text" placeholder="F0 41 10 ... F7" value="${value}">
+        <button class="btn btn-danger btn-small" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(row);
+    }
+
+    function addCcInput(value = "") {
+      const container = document.getElementById('cc-container');
+      let selCh = "4"; // CC par défaut sur Canal 4
+      let restVal = "";
+
+      if (value) {
+        const parts = value.split(',').map(n => n.trim());
+        if (parts.length >= 3) {
+          selCh = parts[0];
+          restVal = parts[1] + "," + parts[2];
+        } else {
+          restVal = value;
+        }
+      }
+
+      let optionsHTML = '';
+      for(let i=1; i<=16; i++) {
+        optionsHTML += `<option value="${i}" ${selCh == i ? 'selected' : ''}>Ch ${i}</option>`;
+      }
+
+      const row = document.createElement('div');
+      row.className = 'sub-item-row';
+      row.innerHTML = `
+        <button class="btn btn-secondary btn-small" onclick="moveSubItem(this, -1)">▲</button>
+        <button class="btn btn-secondary btn-small" onclick="moveSubItem(this, 1)">▼</button>
+        <select class="cc-ch">${optionsHTML}</select>
+        <input type="text" class="cc-val" placeholder="Num,Valeur (ex: 11,127)" value="${restVal}">
+        <button class="btn btn-danger btn-small" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(row);
+    }
+
+    function moveSubItem(button, direction) {
+      const row = button.parentElement;
+      const container = row.parentElement;
+      const rows = Array.from(container.children);
+      const index = rows.indexOf(row);
+      const newIndex = index + direction;
+      if (newIndex >= 0 && newIndex < rows.length) {
+        container.insertBefore(row, direction === -1 ? rows[newIndex] : rows[newIndex].nextSibling);
+      }
+    }
+
+    function closeModal() { document.getElementById('modal').style.display = "none"; }
+
+    function readButtonFromModal() {
+      const label = document.getElementById('btn-label').value || "Bouton";
+      const pc = document.getElementById('btn-pc').value.trim();
+      const pcChannel = parseInt(document.getElementById('btn-pc-channel').value) || 1;
+
+      const sysexInputs = document.querySelectorAll('#sysex-container input');
+      const sysexList = Array.from(sysexInputs).map(i => i.value.trim()).filter(v => v !== "");
+
+      const ccRows = document.querySelectorAll('#cc-container .sub-item-row');
+      const ccList = Array.from(ccRows).map(row => {
+        const ch = row.querySelector('.cc-ch').value;
+        const val = row.querySelector('.cc-val').value.trim();
+        return val ? `${ch},${val}` : null;
+      }).filter(v => v !== null);
+
+      return { label, pc, pcChannel, cc: ccList, sysex: sysexList };
+    }
+
+    function saveButton() {
+      const newBtn = readButtonFromModal();
+
+      if (currentEditIndex !== null) { buttons[currentEditIndex] = newBtn; }
+      else { buttons.push(newBtn); }
+
+      saveToStorage();
+      closeModal();
+    }
+
+    async function testCurrentButton() {
+      const testBtn = document.querySelector('.modal-actions .btn-secondary[onclick="testCurrentButton()"]');
+      const config = readButtonFromModal();
+
+      if (!midiOutput) {
+        alert("Aucun périphérique MIDI sélectionné !");
+        return;
+      }
+
+      if (testBtn) {
+        testBtn.disabled = true;
+        testBtn.innerText = "⏳ Envoi...";
+      }
+      try {
+        await triggerMidiWithDelay(config);
+      } finally {
+        if (testBtn) {
+          testBtn.disabled = false;
+          testBtn.innerText = "🔊 Tester";
+        }
+      }
+    }
+
+    function deleteCurrentButton() {
+      if (currentEditIndex !== null) {
+        buttons.splice(currentEditIndex, 1);
+        saveToStorage();
+        closeModal();
+      }
+    }
+
+    function duplicateCurrentButton() {
+      if (currentEditIndex !== null) {
+        const duplicate = JSON.parse(JSON.stringify(buttons[currentEditIndex]));
+        duplicate.label += " (Copie)";
+        buttons.push(duplicate);
+        saveToStorage();
+        closeModal();
+      }
+    }
+
+    async function doExportButtons(list, fileName) {
+      const jsonStr = JSON.stringify(list, null, 2);
+
+      // 1) Web Share API avec fichier (fonctionne dans certaines WebView si configurées)
+      try {
+        const file = new File([jsonStr], fileName, { type: "application/json" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: "Configuration FP-10" });
+          return;
+        }
+      } catch (err) {
+        // on continue vers le fallback suivant
+      }
+
+      // 2) Blob + lien de téléchargement (mieux supporté que data: dans certaines WebView)
+      try {
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", url);
+        downloadAnchor.setAttribute("download", fileName);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      } catch (err) {
+        // on ignore, le fallback texte ci-dessous couvre ce cas
+      }
+
+      // 3) Fallback garanti : afficher le JSON dans une zone de texte
+      // pour sélection et copie manuelle (fiable dans les WebView type Web2App).
+      showExportFallback(jsonStr);
+    }
+
+    function showExportFallback(jsonStr) {
+      const modal = document.getElementById('export-modal');
+      const textarea = document.getElementById('export-textarea');
+      textarea.value = jsonStr;
+      modal.style.display = "flex";
+      setTimeout(() => {
+        textarea.focus();
+        textarea.select();
+      }, 150);
+    }
+
+    function closeExportModal() {
+      document.getElementById('export-modal').style.display = "none";
+    }
+
+    async function copyExportTextarea() {
+      const textarea = document.getElementById('export-textarea');
+      textarea.focus();
+      textarea.select();
+      try {
+        await navigator.clipboard.writeText(textarea.value);
+        alert("Copié dans le presse-papier !");
+      } catch (err) {
+        try {
+          document.execCommand('copy');
+          alert("Copié dans le presse-papier !");
+        } catch (err2) {
+          alert("Copie automatique impossible : sélectionne le texte manuellement puis copie-le.");
+        }
+      }
+    }
+
+    function importConfig(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (Array.isArray(imported)) {
+            const replace = confirm(
+              `Remplacer tous les boutons actuels par les ${imported.length} bouton(s) de ce fichier ?\n\n` +
+              `OK = Remplacer\nAnnuler = Ajouter à la suite des boutons actuels`
+            );
+            if (replace) {
+              buttons = imported;
+              selectedIndices.clear();
+            } else {
+              buttons = buttons.concat(imported);
+            }
+            saveToStorage();
+            alert(`${imported.length} bouton(s) ${replace ? 'chargé(s) (banque remplacée)' : 'ajouté(s) à la suite'} !`);
+          }
+        } catch (err) { alert("Erreur de chargement : " + err); }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    // ===== Paramètres Piano Design (utilisés dans la fenêtre d'un bouton) =====
+    // Chaque paramètre = un DT1 d'un seul octet (modèle 19), adresses relevées dans les captures Piano Designer.
+    const DESIGN_SYSEX_HEADER = [0xF0, 0x41, 0x10, 0x00, 0x00, 0x00, 0x19, 0x12];
+    const DESIGN_PARAMS = [
+      { id: 'lid',   label: 'Couvercle (lid)',  addr: [0x02,0x00,0x00,0x01], min: 1,   max: 6,   def: 1,  enc: v => v },
+      { id: 'touch', label: 'Key touch',        addr: [0x01,0x00,0x00,0x0B], min: 0,   max: 100, def: 23, enc: v => v },
+      { id: 'bril',  label: 'Brillance',        addr: [0x01,0x00,0x00,0x0A], min: -10, max: 10,  def: 2,  enc: v => 0x40 + v, signed: true },
+      { id: 'reson', label: 'String resonance', addr: [0x02,0x00,0x00,0x02], min: 0,   max: 10,  def: 8,  enc: v => v }
+    ];
+
+    let designRemoteSent = false;
+    let designValues = {};
+    DESIGN_PARAMS.forEach(p => { designValues[p.id] = p.def; });
+    try {
+      const saved = JSON.parse(localStorage.getItem('fp10_design_values') || '{}');
+      DESIGN_PARAMS.forEach(p => {
+        const v = parseInt(saved[p.id], 10);
+        if (!isNaN(v)) designValues[p.id] = Math.max(p.min, Math.min(p.max, v));
+      });
+    } catch (e) {}
+
+    function designParam(id) { return DESIGN_PARAMS.find(p => p.id === id); }
+    function fmtDesign(p, v) { return (p.signed && v > 0) ? '+' + v : String(v); }
+
+    function designMsg(p, v) {
+      const data = [p.enc(v)];
+      return [...DESIGN_SYSEX_HEADER, ...p.addr, ...data, rolandChecksum([...p.addr, ...data]), 0xF7];
+    }
+
+    // ===== Piano Design dans la modale d'un bouton =====
+    function designNorm(v) { return v.trim().toUpperCase().replace(/\s+/g, ' '); }
+    function designPrefix(p) { return toHexStr2([...DESIGN_SYSEX_HEADER, ...p.addr]); }
+
+    // Cherche dans les SysEx du bouton un message Piano Design d'un seul octet pour ce paramètre
+    function findDesignInput(p) {
+      const pre = designPrefix(p) + ' ';
+      return Array.from(document.querySelectorAll('#sysex-container input')).find(i => {
+        if (!designNorm(i.value).startsWith(pre)) return false;
+        const bytes = parseHexSysEx(i.value);
+        return bytes && bytes.length === 15;
+      });
+    }
+
+    function renderModalDesignRows() {
+      document.getElementById('mdl-design-rows').innerHTML = DESIGN_PARAMS.map(p => `
+        <div class="design-card" style="padding:8px; max-width:none; margin-bottom:6px;">
+          <div class="design-head" style="margin-bottom:4px;">
+            <label style="display:flex; align-items:center; gap:8px;">
+              <input type="checkbox" id="mdl-chk-${p.id}" style="width:auto;">
+              <span class="design-name">${p.label}<span class="design-range">${p.min} à ${p.max}</span></span>
+            </label>
+            <span class="design-val" style="font-size:1.2rem;" id="mdl-val-${p.id}">${fmtDesign(p, designValues[p.id])}</span>
+          </div>
+          <div class="design-row">
+            <button class="btn btn-secondary design-step" onclick="stepModalDesign('${p.id}', -1)">−</button>
+            <input type="range" id="mdl-slider-${p.id}" min="${p.min}" max="${p.max}" step="1"
+                   value="${designValues[p.id]}" oninput="onModalDesignInput('${p.id}', this.value)">
+            <button class="btn btn-secondary design-step" onclick="stepModalDesign('${p.id}', 1)">+</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function onModalDesignInput(id, val) {
+      const p = designParam(id);
+      const v = Math.max(p.min, Math.min(p.max, parseInt(val, 10)));
+      if (isNaN(v)) return;
+      document.getElementById('mdl-slider-' + id).value = v;
+      document.getElementById('mdl-val-' + id).innerText = fmtDesign(p, v);
+      document.getElementById('mdl-chk-' + id).checked = true;
+    }
+
+    function stepModalDesign(id, delta) {
+      onModalDesignInput(id, parseInt(document.getElementById('mdl-slider-' + id).value, 10) + delta);
+    }
+
+    // Relit les valeurs déjà présentes dans les SysEx du bouton
+    function syncDesignFromSysex() {
+      DESIGN_PARAMS.forEach(p => {
+        const inp = findDesignInput(p);
+        if (!inp) return;
+        const bytes = parseHexSysEx(inp.value);
+        const v = (p.signed ? bytes[12] - 0x40 : bytes[12]);
+        if (isNaN(v)) return;
+        onModalDesignInput(p.id, v);
+      });
+    }
+
+    function toggleDesignBox() {
+      const box = document.getElementById('design-box');
+      const opening = box.style.display === 'none';
+      box.style.display = opening ? 'flex' : 'none';
+      if (opening) {
+        if (!document.getElementById('mdl-design-rows').innerHTML.trim()) renderModalDesignRows();
+        syncDesignFromSysex();
+      }
+    }
+
+    function addDesignToSysex() {
+      const st = document.getElementById('mdl-design-status');
+      const picked = DESIGN_PARAMS.filter(p => document.getElementById('mdl-chk-' + p.id).checked);
+      if (picked.length === 0) { st.innerText = 'Coche au moins un paramètre.'; return; }
+      const container = document.getElementById('sysex-container');
+
+      if (document.getElementById('mdl-design-remote').checked) {
+        const rem = toHexStr2(REMOTE_CONTROL_MSG);
+        const has = Array.from(container.querySelectorAll('input')).some(i => designNorm(i.value) === rem);
+        if (!has) {
+          addSysexInput(rem);
+          if (container.children.length > 1) container.insertBefore(container.lastElementChild, container.firstElementChild);
+        }
+      }
+
+      picked.forEach(p => {
+        const v = parseInt(document.getElementById('mdl-slider-' + p.id).value, 10);
+        const hex = toHexStr2(designMsg(p, v));
+        const existing = findDesignInput(p);
+        if (existing) existing.value = hex; else addSysexInput(hex);
+      });
+      st.innerText = picked.length + ' paramètre(s) ajouté(s) ou mis à jour dans les SysEx ci-dessus.';
+    }
+
+    renderButtons();
+    initMIDI();
+    requestWakeLock();
+    restoreVolumeControls();
+  </script>
+</body>
+</html>
