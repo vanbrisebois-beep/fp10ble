@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.webkit.JavascriptInterface
 import java.io.ByteArrayOutputStream
@@ -45,6 +46,27 @@ class BleMidiSender(
 
     private val queue = ArrayDeque<ByteArray>()
     private var writing = false
+
+    // ---------- Journal horodaté (diagnostic de la vitesse d'envoi) ----------
+    private val journal = ArrayList<String>()
+    private var t0 = 0L
+    private var lastEvent = 0L
+    private var burstPackets = 0
+
+    private fun jlog(line: String) {
+        val now = SystemClock.elapsedRealtime()
+        synchronized(journal) {
+            if (now - lastEvent > 1500) {
+                t0 = now; burstPackets = 0
+                journal.add("--- nouvel envoi ---")
+            }
+            lastEvent = now
+            journal.add("+${now - t0} ms  $line")
+            while (journal.size > 400) journal.removeAt(0)
+        }
+    }
+
+    fun journalText(): String = synchronized(journal) { journal.joinToString("\n") }
 
     // ---------- Connexion ----------
 
@@ -122,7 +144,13 @@ class BleMidiSender(
         // Contrôle de flux : on n'envoie le paquet suivant qu'après cet accusé
         override fun onCharacteristicWrite(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
             if (status != BluetoothGatt.GATT_SUCCESS) onState("ÉCHEC écriture status=$status") else onState("  paquet écrit OK")
-            main.postDelayed({ writing = false; pump() }, pauseMs)
+            jlog(if (status == BluetoothGatt.GATT_SUCCESS) "  ok" else "  ÉCHEC status=$status")
+            main.postDelayed({
+                writing = false
+                if (queue.isEmpty()) jlog("FIN : $burstPackets paquets, mode " +
+                    (if (useWriteWithResponse) "avec réponse" else "rapide") + ", pause ${pauseMs} ms")
+                pump()
+            }, pauseMs)
         }
     }
 
@@ -234,6 +262,8 @@ class BleMidiSender(
         val g = gatt ?: return
         val data = queue.poll() ?: return
         onState("TX: " + data.joinToString(" ") { "%02X".format(it) })
+        burstPackets++
+        jlog("TX " + data.joinToString(" ") { "%02X".format(it) })
         writing = true
         val type = if (useWriteWithResponse) BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                    else BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE

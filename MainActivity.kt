@@ -10,6 +10,8 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -27,6 +29,8 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.Button
+import android.widget.CheckBox
+import android.widget.ScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 
@@ -77,6 +81,33 @@ class MainActivity : Activity() {
         bar.addView(statusView)
         root.addView(bar)
 
+        val bar2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(12, 0, 12, 8)
+            setBackgroundColor(0xFF1E1E1E.toInt())
+        }
+        val fastBox = CheckBox(this).apply {
+            text = "⚡ Mode rapide"
+            setTextColor(0xFFCCCCCC.toInt())
+            isChecked = prefs.getBoolean("fast", false)
+            setOnCheckedChangeListener { _, on -> applyFast(on) }
+        }
+        val journalBtn = Button(this).apply {
+            text = "📋 Journal"
+            setTextColor(Color.BLACK)
+            setPadding(32, 0, 32, 0)
+            background = GradientDrawable().apply {
+                setColor(0xFF00E5FF.toInt())
+                cornerRadius = 20f
+            }
+            setOnClickListener { showJournal() }
+        }
+        bar2.addView(fastBox)
+        bar2.addView(journalBtn)
+        root.addView(bar2)
+        applyFast(fastBox.isChecked)
+
         web = WebView(this)
         root.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
@@ -104,6 +135,32 @@ class MainActivity : Activity() {
         web.loadUrl("file:///android_asset/index.html")
 
         if (hasPerms()) autoConnect() else requestPerms()
+    }
+
+    /** Mode rapide : écriture sans attendre de réponse du piano + pause plus courte entre paquets. */
+    private fun applyFast(on: Boolean) {
+        sender.useWriteWithResponse = !on
+        sender.pauseMs = if (on) 6L else 15L
+        prefs.edit().putBoolean("fast", on).apply()
+    }
+
+    private fun showJournal() {
+        val txt = sender.journalText().ifEmpty { "(vide : appuie d'abord sur un bouton)" }
+        val tv = TextView(this).apply {
+            text = txt
+            textSize = 11f
+            setTextIsSelectable(true)
+            setPadding(24, 16, 24, 16)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Journal d'envoi")
+            .setView(ScrollView(this).apply { addView(tv) })
+            .setPositiveButton("Copier") { _, _ ->
+                val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("journal", txt))
+            }
+            .setNegativeButton("Fermer", null)
+            .show()
     }
 
     private fun perms(): Array<String> =
