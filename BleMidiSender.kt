@@ -281,8 +281,22 @@ class BleMidiSender(
     }
 }
 
-/** Pont appelé par index.html : AndroidMidi.raw("F0 41 … F7") */
-class MidiBridge(private val s: BleMidiSender) {
+/** Actions que la page peut demander à l'app. */
+interface MidiHost {
+    fun connect()
+    fun setFast(on: Boolean)
+    fun isFast(): Boolean
+    fun journal()
+    fun status(): String
+}
+
+/** Pont appelé par index.html : AndroidMidi.raw("F0 41 … F7"), AndroidMidi.connect(), etc. */
+class MidiBridge(private val s: BleMidiSender, private val h: MidiHost) {
     @JavascriptInterface fun raw(hex: String) = s.sendRawHex(hex)
     @JavascriptInterface fun ready(): Boolean = s.ready
+    @JavascriptInterface fun connect() = h.connect()
+    @JavascriptInterface fun setFast(on: Boolean) = h.setFast(on)
+    @JavascriptInterface fun isFast(): Boolean = h.isFast()
+    @JavascriptInterface fun journal() = h.journal()
+    @JavascriptInterface fun status(): String = h.status()
 }

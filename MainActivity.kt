@@ -14,110 +14,71 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
-import android.view.Gravity
-import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
-import android.widget.Button
-import android.widget.CheckBox
+import android.webkit.WebViewClient
 import android.widget.ScrollView
-import android.widget.LinearLayout
 import android.widget.TextView
+import org.json.JSONObject
 
 @SuppressLint("MissingPermission", "SetJavaScriptEnabled")
 class MainActivity : Activity() {
 
     private lateinit var sender: BleMidiSender
     private lateinit var web: WebView
-    private lateinit var statusView: TextView
     private val ui = Handler(Looper.getMainLooper())
     private var fileCb: ValueCallback<Array<Uri>>? = null
     private val prefs by lazy { getSharedPreferences("fp10", MODE_PRIVATE) }
+    @Volatile private var lastStatus = "Déconnecté"
 
-    private fun status(s: String) = runOnUiThread {
-        // on n'affiche que les états de connexion, pas le détail des paquets
-        if (!s.startsWith("TX") && !s.startsWith("RX") && !s.startsWith("  paquet")) statusView.text = s
+    /** État de connexion : mémorisé et envoyé à la page. */
+    private fun status(s: String) {
+        if (s.startsWith("TX") || s.startsWith("RX") || s.startsWith("  paquet")) return
+        lastStatus = s
+        runOnUiThread { pushStatus() }
+    }
+
+    private fun pushStatus() {
+        if (!::web.isInitialized) return
+        web.evaluateJavascript(
+            "window.onNativeStatus && window.onNativeStatus(" + JSONObject.quote(lastStatus) + ")", null)
+    }
+
+    /** Ce que la page peut demander à l'app. */
+    private val host = object : MidiHost {
+        override fun connect() { runOnUiThread { scan() } }
+        override fun setFast(on: Boolean) { runOnUiThread { applyFast(on) } }
+        override fun isFast(): Boolean = prefs.getBoolean("fast", true)
+        override fun journal() { runOnUiThread { showJournal() } }
+        override fun status(): String = lastStatus
     }
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         sender = BleMidiSender(this, onState = { status(it) })
-
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(12, 8, 12, 8)
-            setBackgroundColor(0xFF1E1E1E.toInt())
-        }
-        val connectBtn = Button(this).apply {
-            text = "🔌 Connecter FP-10"
-            setTextColor(Color.BLACK)
-            setPadding(32, 0, 32, 0)
-            background = GradientDrawable().apply {
-                setColor(0xFF00E5FF.toInt())   // cyan, comme les accents de l'interface
-                cornerRadius = 20f
-            }
-            setOnClickListener { scan() }
-        }
-        statusView = TextView(this).apply {
-            text = "Déconnecté"
-            setTextColor(0xFFCCCCCC.toInt())
-            textSize = 12f
-            setPadding(16, 0, 0, 0)
-        }
-        bar.addView(connectBtn)
-        bar.addView(statusView)
-        root.addView(bar)
-
-        val bar2 = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(12, 0, 12, 8)
-            setBackgroundColor(0xFF1E1E1E.toInt())
-        }
-        val fastBox = CheckBox(this).apply {
-            text = "⚡ Mode rapide"
-            setTextColor(0xFFCCCCCC.toInt())
-            isChecked = prefs.getBoolean("fast", false)
-            setOnCheckedChangeListener { _, on -> applyFast(on) }
-        }
-        val journalBtn = Button(this).apply {
-            text = "📋 Journal"
-            setTextColor(Color.BLACK)
-            setPadding(32, 0, 32, 0)
-            background = GradientDrawable().apply {
-                setColor(0xFF00E5FF.toInt())
-                cornerRadius = 20f
-            }
-            setOnClickListener { showJournal() }
-        }
-        bar2.addView(fastBox)
-        bar2.addView(journalBtn)
-        root.addView(bar2)
-        applyFast(fastBox.isChecked)
+        applyFast(prefs.getBoolean("fast", true))
 
         web = WebView(this)
-        root.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        setContentView(root)
+        setContentView(web)   // la page occupe tout l'écran et défile en entier
 
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true   // localStorage : la banque de boutons y est stockée
         web.settings.allowFileAccess = true
-        web.addJavascriptInterface(MidiBridge(sender), "AndroidMidi")
+        web.addJavascriptInterface(MidiBridge(sender, host), "AndroidMidi")
+        web.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(v: WebView, url: String) { pushStatus() }
+        }
         web.webChromeClient = object : WebChromeClient() {
-            // fenêtres alert / confirm / prompt gérées par défaut ; sélecteur de fichier pour « Charger boutons »
+            // sélecteur de fichier pour « Charger boutons »
             override fun onShowFileChooser(
                 w: WebView, cb: ValueCallback<Array<Uri>>, params: FileChooserParams
             ): Boolean {

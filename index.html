@@ -402,7 +402,7 @@
       <circle cx="256" cy="85" r="18" fill="#00e5ff"/>
     </svg>
     <span>Contrôleur FP-10 Pro</span>
-    <span class="version-tag">v44</span>
+    <span class="version-tag">v45</span>
   </h1>
 
   <div class="status-card">
@@ -415,6 +415,13 @@
       </select>
       <button class="btn btn-secondary btn-small" onclick="initMIDI()" title="Rafraîchir les périphériques">🔄</button>
       <button class="btn btn-danger btn-small" id="btn-delete-device" onclick="removeSelectedDevice()" style="display:none;" title="Supprimer ce contrôleur">🗑️ Supprimer</button>
+    </div>
+    <div id="native-row" style="display:none; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+      <button class="btn btn-small" onclick="AndroidMidi.connect()">🔌 Connecter FP-10</button>
+      <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem;">
+        <input type="checkbox" id="native-fast" style="width:auto;" onchange="AndroidMidi.setFast(this.checked)"> ⚡ Mode rapide
+      </label>
+      <button class="btn btn-secondary btn-small" onclick="AndroidMidi.journal()">📋 Journal</button>
     </div>
   </div>
 
@@ -575,6 +582,20 @@
     ];
 
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+    // En mode natif, le temps de pause après SysEx / CC est réduit (la file Bluetooth gère déjà le rythme)
+    const PAUSE_AFTER_SYSEX = window.AndroidMidi ? 100 : 200;
+    const PAUSE_AFTER_CC = window.AndroidMidi ? 100 : 200;
+
+    // Appelé par l'app Android pour afficher l'état réel de la connexion Bluetooth
+    window.onNativeStatus = function (txt) {
+      const el = document.getElementById('status');
+      if (!el) return;
+      el.innerText = 'Statut : ' + txt;
+      const ok = /^Prêt/.test(txt);
+      const busy = /Connexion|Recherche|négociation|MTU/.test(txt);
+      el.style.color = ok ? '#00e5ff' : (busy ? '#ffca28' : '#ff5252');
+      if (ok) designRemoteSent = false;   // le piano doit recevoir à nouveau le remote control
+    };
 
     async function requestWakeLock() {
       if ('wakeLock' in navigator) {
@@ -767,8 +788,12 @@
           }
         };
         availableOutputs = [nativeOut];
-        selectEl.innerHTML = '<option value="android-ble">FP-10 (BLE natif)</option>';
-        selectMidiOutput('android-ble');
+        midiOutput = nativeOut;
+        designRemoteSent = false;
+        document.querySelector('.device-row').style.display = 'none';
+        document.getElementById('native-row').style.display = 'flex';
+        document.getElementById('native-fast').checked = AndroidMidi.isFast();
+        window.onNativeStatus(AndroidMidi.status());
         return;
       }
 
@@ -1006,7 +1031,7 @@
         }
       }
 
-      if (hasSentSysex) await delay(200);
+      if (hasSentSysex) await delay(PAUSE_AFTER_SYSEX);
 
       // 2. Control Change (CC)
       if (config.cc && Array.isArray(config.cc)) {
@@ -1020,7 +1045,7 @@
         }
       }
 
-      if (hasSentCc) await delay(200);
+      if (hasSentCc) await delay(PAUSE_AFTER_CC);
 
       // 3. Program Change (PC) - Canal 1 par défaut
       if (config.pc !== "" && config.pc !== null && !isNaN(parseInt(config.pc))) {
