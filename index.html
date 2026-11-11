@@ -402,7 +402,7 @@
       <circle cx="256" cy="85" r="18" fill="#00e5ff"/>
     </svg>
     <span>Contrôleur FP-10 Pro</span>
-    <span class="version-tag">v45</span>
+    <span class="version-tag">v46</span>
   </h1>
 
   <div class="status-card">
@@ -423,6 +423,24 @@
       </label>
       <button class="btn btn-secondary btn-small" onclick="AndroidMidi.journal()">📋 Journal</button>
     </div>
+    <details id="delay-panel" style="margin-top:10px;">
+      <summary style="cursor:pointer; font-size:0.85rem;">⏱️ Réglage des délais (ms)</summary>
+      <div style="display:grid; grid-template-columns:1fr 90px; gap:6px 10px; align-items:center; margin-top:8px; font-size:0.85rem;">
+        <label for="dl-gap">Entre deux SysEx</label>
+        <input type="number" id="dl-gap" min="0" max="2000" step="5" oninput="onDelayInput('gap', this.value)">
+        <label for="dl-gapRemote">Après le remote control</label>
+        <input type="number" id="dl-gapRemote" min="0" max="2000" step="5" oninput="onDelayInput('gapRemote', this.value)">
+        <label for="dl-afterSysex">Entre les SysEx et les CC</label>
+        <input type="number" id="dl-afterSysex" min="0" max="2000" step="10" oninput="onDelayInput('afterSysex', this.value)">
+        <label for="dl-gapCc">Entre deux CC</label>
+        <input type="number" id="dl-gapCc" min="0" max="2000" step="5" oninput="onDelayInput('gapCc', this.value)">
+        <label for="dl-afterCc">Entre les CC et le PC</label>
+        <input type="number" id="dl-afterCc" min="0" max="2000" step="10" oninput="onDelayInput('afterCc', this.value)">
+        <label for="dl-ble" class="native-only" style="display:none;">Pause entre paquets Bluetooth</label>
+        <input type="number" id="dl-ble" class="native-only" style="display:none;" min="0" max="200" step="1" oninput="onBlePause(this.value)">
+      </div>
+      <button class="btn btn-secondary btn-small" style="margin-top:8px;" onclick="resetDelays()">↩️ Valeurs par défaut</button>
+    </details>
   </div>
 
   <div id="tab-boutons">
@@ -582,9 +600,56 @@
     ];
 
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-    // En mode natif, le temps de pause après SysEx / CC est réduit (la file Bluetooth gère déjà le rythme)
-    const PAUSE_AFTER_SYSEX = window.AndroidMidi ? 100 : 200;
-    const PAUSE_AFTER_CC = window.AndroidMidi ? 100 : 200;
+    // ===== Réglage des délais (ms), mémorisés =====
+    const DELAY_DEFAULTS = {
+      gap: 35,          // entre deux messages SysEx
+      gapRemote: 60,    // après le remote control
+      afterSysex: window.AndroidMidi ? 100 : 200,   // entre les SysEx et les CC
+      gapCc: 0,         // entre deux CC
+      afterCc: window.AndroidMidi ? 100 : 200       // entre les CC et le PC
+    };
+    let delays = Object.assign({}, DELAY_DEFAULTS);
+    try {
+      const saved = JSON.parse(localStorage.getItem('fp10_delays') || '{}');
+      for (const k of Object.keys(DELAY_DEFAULTS)) {
+        if (typeof saved[k] === 'number' && saved[k] >= 0) delays[k] = saved[k];
+      }
+    } catch (e) {}
+
+    function saveDelays() {
+      try { localStorage.setItem('fp10_delays', JSON.stringify(delays)); } catch (e) {}
+    }
+
+    function renderDelays() {
+      for (const k of Object.keys(DELAY_DEFAULTS)) {
+        const el = document.getElementById('dl-' + k);
+        if (el) el.value = delays[k];
+      }
+      if (window.AndroidMidi) {
+        document.querySelectorAll('.native-only').forEach(el => { el.style.display = ''; });
+        document.getElementById('dl-ble').value = AndroidMidi.getPause();
+      }
+    }
+
+    function onDelayInput(key, val) {
+      const v = parseInt(val, 10);
+      if (isNaN(v)) return;
+      delays[key] = Math.max(0, Math.min(2000, v));
+      saveDelays();
+    }
+
+    function onBlePause(val) {
+      const v = parseInt(val, 10);
+      if (isNaN(v) || !window.AndroidMidi) return;
+      AndroidMidi.setPause(Math.max(0, Math.min(200, v)));
+    }
+
+    function resetDelays() {
+      delays = Object.assign({}, DELAY_DEFAULTS);
+      saveDelays();
+      if (window.AndroidMidi) AndroidMidi.setPause(-1);   // -1 = valeur par défaut de l'app
+      renderDelays();
+    }
 
     // Appelé par l'app Android pour afficher l'état réel de la connexion Bluetooth
     window.onNativeStatus = function (txt) {
@@ -1026,12 +1091,12 @@
           midiOutput.send(new Uint8Array(sysexMsgs[i]));
           hasSentSysex = true;
           if (i < sysexMsgs.length - 1) {
-            await delay(sameMessage(sysexMsgs[i], REMOTE_CONTROL_MSG) ? 60 : 35);
+            await delay(sameMessage(sysexMsgs[i], REMOTE_CONTROL_MSG) ? delays.gapRemote : delays.gap);
           }
         }
       }
 
-      if (hasSentSysex) await delay(PAUSE_AFTER_SYSEX);
+      if (hasSentSysex) await delay(delays.afterSysex);
 
       // 2. Control Change (CC)
       if (config.cc && Array.isArray(config.cc)) {
@@ -1039,13 +1104,14 @@
           const parts = item.split(',').map(n => parseInt(n.trim()));
           if (parts.length >= 3) {
             const ch = Math.max(0, Math.min(15, parts[0] - 1));
+            if (hasSentCc && delays.gapCc > 0) await delay(delays.gapCc);
             midiOutput.send([0xB0 + ch, parts[1], parts[2]]);
             hasSentCc = true;
           }
         }
       }
 
-      if (hasSentCc) await delay(PAUSE_AFTER_CC);
+      if (hasSentCc) await delay(delays.afterCc);
 
       // 3. Program Change (PC) - Canal 1 par défaut
       if (config.pc !== "" && config.pc !== null && !isNaN(parseInt(config.pc))) {
@@ -1462,6 +1528,7 @@
 
     renderButtons();
     initMIDI();
+    renderDelays();
     requestWakeLock();
     restoreVolumeControls();
   </script>

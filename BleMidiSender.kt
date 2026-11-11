@@ -288,6 +288,8 @@ interface MidiHost {
     fun isFast(): Boolean
     fun journal()
     fun status(): String
+    fun setPause(ms: Int)
+    fun getPause(): Int
 }
 
 /** Pont appelé par index.html : AndroidMidi.raw("F0 41 … F7"), AndroidMidi.connect(), etc. */
@@ -299,4 +301,6 @@ class MidiBridge(private val s: BleMidiSender, private val h: MidiHost) {
     @JavascriptInterface fun isFast(): Boolean = h.isFast()
     @JavascriptInterface fun journal() = h.journal()
     @JavascriptInterface fun status(): String = h.status()
+    @JavascriptInterface fun setPause(ms: Int) = h.setPause(ms)
+    @JavascriptInterface fun getPause(): Int = h.getPause()
 }

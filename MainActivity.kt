@@ -59,6 +59,11 @@ class MainActivity : Activity() {
         override fun isFast(): Boolean = prefs.getBoolean("fast", true)
         override fun journal() { runOnUiThread { showJournal() } }
         override fun status(): String = lastStatus
+        override fun setPause(ms: Int) {
+            prefs.edit().putInt("pause", if (ms < 0) -1 else ms).apply()
+            sender.pauseMs = effectivePause()
+        }
+        override fun getPause(): Int = effectivePause().toInt()
     }
 
     override fun onCreate(b: Bundle?) {
@@ -101,8 +106,14 @@ class MainActivity : Activity() {
     /** Mode rapide : écriture sans attendre de réponse du piano + pause plus courte entre paquets. */
     private fun applyFast(on: Boolean) {
         sender.useWriteWithResponse = !on
-        sender.pauseMs = if (on) 6L else 15L
         prefs.edit().putBoolean("fast", on).apply()
+        sender.pauseMs = effectivePause()
+    }
+
+    /** Pause entre paquets : valeur réglée dans la page, sinon 6 ms (rapide) ou 15 ms. */
+    private fun effectivePause(): Long {
+        val p = prefs.getInt("pause", -1)
+        return if (p >= 0) p.toLong() else if (prefs.getBoolean("fast", true)) 6L else 15L
     }
 
     private fun showJournal() {
