@@ -55,7 +55,7 @@ class MainActivity : Activity() {
     /** Ce que la page peut demander à l'app. */
     private val host = object : MidiHost {
         override fun connect() { runOnUiThread { scan() } }
-        override fun setFast(on: Boolean) { runOnUiThread { applyFast(on) } }
+        override fun setFast(on: Boolean) { applyFast(on) }
         override fun isFast(): Boolean = prefs.getBoolean("fast", true)
         override fun journal() { runOnUiThread { showJournal() } }
         override fun status(): String = lastStatus

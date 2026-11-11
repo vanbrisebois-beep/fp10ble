@@ -402,7 +402,7 @@
       <circle cx="256" cy="85" r="18" fill="#00e5ff"/>
     </svg>
     <span>Contrôleur FP-10 Pro</span>
-    <span class="version-tag">v46</span>
+    <span class="version-tag">v47</span>
   </h1>
 
   <div class="status-card">
@@ -419,7 +419,7 @@
     <div id="native-row" style="display:none; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
       <button class="btn btn-small" onclick="AndroidMidi.connect()">🔌 Connecter FP-10</button>
       <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem;">
-        <input type="checkbox" id="native-fast" style="width:auto;" onchange="AndroidMidi.setFast(this.checked)"> ⚡ Mode rapide
+        <input type="checkbox" id="native-fast" style="width:auto;" onchange="AndroidMidi.setFast(this.checked); document.getElementById('dl-ble').value = AndroidMidi.getPause();"> ⚡ Mode rapide
       </label>
       <button class="btn btn-secondary btn-small" onclick="AndroidMidi.journal()">📋 Journal</button>
     </div>
