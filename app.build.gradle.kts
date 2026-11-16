@@ -7,7 +7,7 @@ android {
     namespace = "com.example.fp10ble"
     compileSdk = 34
     defaultConfig {
-        applicationId = "com.example.fp10ctrl"
+        applicationId = "com.example.fp10ctrl.test"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
