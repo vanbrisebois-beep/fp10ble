@@ -290,6 +290,12 @@ interface MidiHost {
     fun status(): String
     fun setPause(ms: Int)
     fun getPause(): Int
+    fun setMediaVolume(pct: Int)
+    fun getMediaVolume(): Int
+    fun fluidList(): String
+    fun fluidSelect(index: Int)
+    fun fluidSend(hex: String)
+    fun fluidStatus(): String
 }
 
 /** Pont appelé par index.html : AndroidMidi.raw("F0 41 … F7"), AndroidMidi.connect(), etc. */
@@ -303,4 +309,10 @@ class MidiBridge(private val s: BleMidiSender, private val h: MidiHost) {
     @JavascriptInterface fun status(): String = h.status()
     @JavascriptInterface fun setPause(ms: Int) = h.setPause(ms)
     @JavascriptInterface fun getPause(): Int = h.getPause()
+    @JavascriptInterface fun setMediaVolume(pct: Int) = h.setMediaVolume(pct)
+    @JavascriptInterface fun getMediaVolume(): Int = h.getMediaVolume()
+    @JavascriptInterface fun fluidList(): String = h.fluidList()
+    @JavascriptInterface fun fluidSelect(index: Int) = h.fluidSelect(index)
+    @JavascriptInterface fun fluidSend(hex: String) = h.fluidSend(hex)
+    @JavascriptInterface fun fluidStatus(): String = h.fluidStatus()
 }

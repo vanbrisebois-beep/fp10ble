@@ -402,7 +402,7 @@
       <circle cx="256" cy="85" r="18" fill="#00e5ff"/>
     </svg>
     <span>Contrôleur FP-10 Pro</span>
-    <span class="version-tag">v47</span>
+    <span class="version-tag">v49</span>
   </h1>
 
   <div class="status-card">
@@ -475,6 +475,33 @@
     <input type="range" id="volume-slider" min="0" max="100" value="100" oninput="onVolumeChange(this.value)">
     <span id="volume-value" class="volume-value">100</span>
   </div>
+
+  <div class="volume-row" id="phone-volume-row" style="margin: 8px auto; display:none;">
+    <span class="volume-label" title="Volume du téléphone (FluidSynth et autres apps)">📱</span>
+    <input type="range" id="phone-volume-slider" min="0" max="100" value="50" oninput="onPhoneVolume(this.value)">
+    <span id="phone-volume-value" class="volume-value">50</span>
+  </div>
+
+  <div class="volume-row" id="fluid-volume-row" style="margin: 8px auto; display:none;">
+    <span class="volume-label" title="Volume interne de FluidSynth">🎛️</span>
+    <input type="range" id="fluid-slider" min="0" max="127" value="100" oninput="onFluidVolume(this.value)">
+    <span id="fluid-value" class="volume-value">100</span>
+  </div>
+  <details id="fluid-panel" style="display:none; margin: 4px auto 8px; max-width:500px; width:100%;">
+    <summary style="cursor:pointer; font-size:0.85rem;">🎛️ Réglage FluidSynth</summary>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px; font-size:0.85rem;">
+      <label>Appareil MIDI cible (l'app FluidSynth doit y apparaître)</label>
+      <select id="fluid-target" onchange="onFluidTarget()"></select>
+      <button class="btn btn-secondary btn-small" onclick="refreshFluidTargets()">🔄 Chercher les appareils</button>
+      <label>Message envoyé par le curseur</label>
+      <select id="fluid-mode" onchange="onFluidMode(this.value)">
+        <option value="cc1">CC7 (volume) – canal 1</option>
+        <option value="ccall">CC7 (volume) – les 16 canaux</option>
+        <option value="master">Volume général (SysEx master)</option>
+      </select>
+      <div id="fluid-status" style="opacity:0.8;">Aucune cible choisie</div>
+    </div>
+  </details>
 
   <div class="grid" id="button-grid"></div>
   </div>
@@ -706,6 +733,109 @@
       const cs = rolandChecksum([...VOLUME_SYSEX_ADDR, val]);
       const msg = [...VOLUME_SYSEX_HEADER, ...VOLUME_SYSEX_ADDR, val, cs, 0xF7];
       midiOutput.send(new Uint8Array(msg));
+    }
+
+    // ===== Volume du téléphone (flux « Média » d'Android : FluidSynth, etc.) =====
+    function onPhoneVolume(val) {
+      document.getElementById('phone-volume-value').innerText = val;
+      if (window.AndroidMidi) AndroidMidi.setMediaVolume(parseInt(val, 10));
+    }
+
+    function refreshPhoneVolume() {
+      if (!window.AndroidMidi) return;
+      const slider = document.getElementById('phone-volume-slider');
+      if (document.activeElement === slider) return;   // pas pendant qu'on le touche
+      const v = AndroidMidi.getMediaVolume();
+      slider.value = v;
+      document.getElementById('phone-volume-value').innerText = v;
+    }
+
+    function initPhoneVolume() {
+      if (!window.AndroidMidi) return;
+      document.getElementById('phone-volume-row').style.display = 'flex';
+      refreshPhoneVolume();
+      setInterval(refreshPhoneVolume, 1500);   // suit aussi les boutons physiques de volume
+    }
+
+    // ===== Volume interne de FluidSynth (MIDI envoyé via l'API MIDI d'Android) =====
+    let fluidTimer = null;
+
+    function sendFluidVolume(v) {
+      if (!window.AndroidMidi) return;
+      const mode = document.getElementById('fluid-mode').value;
+      const hx = n => ('0' + n.toString(16)).slice(-2);
+      let msgs = [];
+      if (mode === 'cc1') {
+        msgs = [[0xB0, 7, v]];
+      } else if (mode === 'ccall') {
+        for (let ch = 0; ch < 16; ch++) msgs.push([0xB0 + ch, 7, v]);
+      } else {
+        const val = Math.round(v / 127 * 16383);
+        msgs = [[0xF0, 0x7F, 0x7F, 0x04, 0x01, val & 0x7F, (val >> 7) & 0x7F, 0xF7]];
+      }
+      AndroidMidi.fluidSend(msgs.map(m => m.map(hx).join(' ')).join(' '));
+    }
+
+    function onFluidVolume(val) {
+      const v = Math.max(0, Math.min(127, parseInt(val, 10)));
+      if (isNaN(v)) return;
+      document.getElementById('fluid-value').innerText = v;
+      try { localStorage.setItem('fp10_fluid_volume', v); } catch (e) {}
+      clearTimeout(fluidTimer);
+      fluidTimer = setTimeout(() => sendFluidVolume(v), 30);
+    }
+
+    function onFluidMode(m) {
+      try { localStorage.setItem('fp10_fluid_mode', m); } catch (e) {}
+    }
+
+    function refreshFluidTargets() {
+      if (!window.AndroidMidi) return;
+      const sel = document.getElementById('fluid-target');
+      let list = [];
+      try { list = JSON.parse(AndroidMidi.fluidList()); } catch (e) {}
+      sel.innerHTML = '';
+      if (!list.length) {
+        const o = document.createElement('option');
+        o.value = ''; o.textContent = '(aucun appareil MIDI trouvé)';
+        sel.appendChild(o);
+        return;
+      }
+      const ph = document.createElement('option');
+      ph.value = ''; ph.textContent = '— choisir —';
+      sel.appendChild(ph);
+      list.forEach(d => {
+        const o = document.createElement('option');
+        o.value = d.index; o.textContent = d.name;
+        sel.appendChild(o);
+      });
+    }
+
+    function onFluidTarget() {
+      const v = document.getElementById('fluid-target').value;
+      if (v !== '') AndroidMidi.fluidSelect(parseInt(v, 10));
+    }
+
+    window.onFluidStatus = function (txt) {
+      const el = document.getElementById('fluid-status');
+      if (el) el.innerText = txt;
+    };
+
+    function initFluid() {
+      if (!window.AndroidMidi) return;
+      document.getElementById('fluid-volume-row').style.display = 'flex';
+      document.getElementById('fluid-panel').style.display = 'block';
+      try {
+        const m = localStorage.getItem('fp10_fluid_mode');
+        if (m) document.getElementById('fluid-mode').value = m;
+        const v = localStorage.getItem('fp10_fluid_volume');
+        if (v !== null) {
+          document.getElementById('fluid-slider').value = v;
+          document.getElementById('fluid-value').innerText = v;
+        }
+      } catch (e) {}
+      refreshFluidTargets();
+      window.onFluidStatus(AndroidMidi.fluidStatus());
     }
 
     function restoreVolumeControls() {
@@ -1529,6 +1659,8 @@
     renderButtons();
     initMIDI();
     renderDelays();
+    initPhoneVolume();
+    initFluid();
     requestWakeLock();
     restoreVolumeControls();
   </script>

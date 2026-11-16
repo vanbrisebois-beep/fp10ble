@@ -14,6 +14,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.midi.MidiDevice
+import android.media.midi.MidiDeviceInfo
+import android.media.midi.MidiInputPort
+import android.media.midi.MidiManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -27,6 +32,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ScrollView
 import android.widget.TextView
+import org.json.JSONArray
 import org.json.JSONObject
 
 @SuppressLint("MissingPermission", "SetJavaScriptEnabled")
@@ -38,6 +44,10 @@ class MainActivity : Activity() {
     private var fileCb: ValueCallback<Array<Uri>>? = null
     private val prefs by lazy { getSharedPreferences("fp10", MODE_PRIVATE) }
     @Volatile private var lastStatus = "Déconnecté"
+    @Volatile private var fluidStatusText = "Aucune cible choisie"
+    private var fluidInfos: List<MidiDeviceInfo> = emptyList()
+    private var fluidDevice: MidiDevice? = null
+    private var fluidPort: MidiInputPort? = null
 
     /** État de connexion : mémorisé et envoyé à la page. */
     private fun status(s: String) {
@@ -50,6 +60,8 @@ class MainActivity : Activity() {
         if (!::web.isInitialized) return
         web.evaluateJavascript(
             "window.onNativeStatus && window.onNativeStatus(" + JSONObject.quote(lastStatus) + ")", null)
+        web.evaluateJavascript(
+            "window.onFluidStatus && window.onFluidStatus(" + JSONObject.quote(fluidStatusText) + ")", null)
     }
 
     /** Ce que la page peut demander à l'app. */
@@ -64,6 +76,21 @@ class MainActivity : Activity() {
             sender.pauseMs = effectivePause()
         }
         override fun getPause(): Int = effectivePause().toInt()
+        override fun setMediaVolume(pct: Int) {
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val v = Math.round(pct.coerceIn(0, 100) * max / 100f)
+            am.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0)
+        }
+        override fun fluidList(): String = listFluidTargets()
+        override fun fluidSelect(index: Int) { runOnUiThread { openFluid(index) } }
+        override fun fluidSend(hex: String) = sendToFluid(hex)
+        override fun fluidStatus(): String = fluidStatusText
+        override fun getMediaVolume(): Int {
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            return Math.round(am.getStreamVolume(AudioManager.STREAM_MUSIC) * 100f / max)
+        }
     }
 
     override fun onCreate(b: Bundle?) {
@@ -101,6 +128,95 @@ class MainActivity : Activity() {
         web.loadUrl("file:///android_asset/index.html")
 
         if (hasPerms()) autoConnect() else requestPerms()
+        autoFluid()
+    }
+
+    // ---------- Cible MIDI Android (FluidSynth) ----------
+
+    private fun midiName(d: MidiDeviceInfo): String =
+        d.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "Appareil ${d.id}"
+
+    @Suppress("DEPRECATION")
+    private fun listFluidTargets(): String {
+        val mm = getSystemService(MIDI_SERVICE) as MidiManager
+        val infos = mm.devices.filter { it.inputPortCount > 0 }
+        fluidInfos = infos
+        val arr = JSONArray()
+        infos.forEachIndexed { i, d ->
+            val kind = when (d.type) {
+                MidiDeviceInfo.TYPE_USB -> "USB"
+                MidiDeviceInfo.TYPE_VIRTUAL -> "virtuel"
+                MidiDeviceInfo.TYPE_BLUETOOTH -> "Bluetooth"
+                else -> "?"
+            }
+            arr.put(JSONObject().put("index", i).put("name", "${midiName(d)} ($kind)"))
+        }
+        return arr.toString()
+    }
+
+    private fun setFluidStatus(s: String) {
+        fluidStatusText = s
+        runOnUiThread { pushStatus() }
+    }
+
+    private fun openFluid(index: Int) {
+        val info = fluidInfos.getOrNull(index) ?: return
+        try { fluidPort?.close() } catch (e: Exception) {}
+        try { fluidDevice?.close() } catch (e: Exception) {}
+        fluidPort = null; fluidDevice = null
+        setFluidStatus("Ouverture de ${midiName(info)}…")
+        val mm = getSystemService(MIDI_SERVICE) as MidiManager
+        mm.openDevice(info, { dev ->
+            if (dev == null) {
+                setFluidStatus("Impossible d'ouvrir l'appareil")
+            } else {
+                fluidDevice = dev
+                fluidPort = dev.openInputPort(0)
+                if (fluidPort == null) {
+                    setFluidStatus("Port d'entrée absent ou déjà utilisé")
+                } else {
+                    prefs.edit().putString("fluid_name", midiName(info)).apply()
+                    setFluidStatus("Connecté : ${midiName(info)}")
+                }
+            }
+        }, ui)
+    }
+
+    /** Rouvre automatiquement la dernière cible, si elle est encore présente. */
+    private fun autoFluid() {
+        val saved = prefs.getString("fluid_name", null) ?: return
+        try {
+            listFluidTargets()
+            val i = fluidInfos.indexOfFirst { midiName(it) == saved }
+            if (i >= 0) openFluid(i)
+        } catch (e: Exception) { }
+    }
+
+    /** Envoie des octets MIDI bruts, un message à la fois (F0…F7 ou statut + données). */
+    private fun sendToFluid(hex: String) {
+        val port = fluidPort ?: return
+        val b = hex.trim().split(Regex("[\\s,]+")).filter { it.isNotEmpty() }
+            .map { it.toInt(16) and 0xFF }.toIntArray()
+        var i = 0
+        try {
+            while (i < b.size) {
+                var j: Int
+                if (b[i] == 0xF0) {
+                    j = i
+                    while (j < b.size && b[j] != 0xF7) j++
+                    if (j >= b.size) break
+                    j++
+                } else if (b[i] >= 0x80) {
+                    j = i + 1
+                    while (j < b.size && b[j] < 0x80) j++
+                } else { i++; continue }
+                val msg = ByteArray(j - i) { b[i + it].toByte() }
+                port.send(msg, 0, msg.size)
+                i = j
+            }
+        } catch (e: Exception) {
+            setFluidStatus("Erreur d'envoi : ${e.message}")
+        }
     }
 
     /** Mode rapide : écriture sans attendre de réponse du piano + pause plus courte entre paquets. */
@@ -194,6 +310,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        try { fluidPort?.close() } catch (e: Exception) {}
+        try { fluidDevice?.close() } catch (e: Exception) {}
         sender.disconnect()
         super.onDestroy()
     }
